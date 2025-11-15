@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naegleria Fowleri Educational Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .card {
+            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        /* Custom scrollbar for better visibility */
+        .response-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .response-container::-webkit-scrollbar-thumb {
+            background-color: #93c5fd;
+            border-radius: 4px;
+        }
+        .response-container::-webkit-scrollbar-track {
+            background-color: #f1f1f1;
+        }
+        .loading-animation {
+            border-top-color: #f3f4f6;
+            border-left-color: #f3f4f6;
+            border-bottom-color: #f3f4f6;
+            border-right-color: #ef4444;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex justify-center items-start">
+
+    <div class="w-full max-w-2xl">
+        
+        <!-- Medical Disclaimer -->
+        <div class="card gradient-bg text-white p-6 rounded-xl mb-6 shadow-xl">
+            <div class="flex items-center space-x-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-100" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.428 2.677-1.428 3.442 0l7.2 13.499A2.001 2.001 0 0118 18H2c-.74 0-1.429-.413-1.789-1.077l7.2-13.499zM10 13a1 1 0 100 2 1 1 0 000-2zm0-6a1 1 0 00-1 1v3a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <h2 class="text-xl font-extrabold tracking-tight">IMMEDIATE MEDICAL WARNING</h2>
+            </div>
+            <p class="mt-2 text-sm font-medium text-red-50">
+                If you suspect exposure or are experiencing severe symptoms (headache, fever, vomiting, stiff neck), **call emergency services (911 or your local equivalent) or seek professional medical help immediately.** This application provides **educational content only** and cannot diagnose illness.
+            </p>
+        </div>
+
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">Amoeba Educational Guide</h1>
+            <p class="text-gray-500 mt-1">Get reliable information about symptoms and risks.</p>
+        </header>
+
+        <!-- Input Form -->
+        <div class="card bg-white p-6 rounded-xl border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Check Symptoms / Ask a Question</h3>
+            <form id="symptomForm" class="space-y-4">
+                <textarea
+                    id="userInput"
+                    rows="4"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-gray-700 placeholder-gray-400 resize-none"
+                    placeholder="E.g., 'I have a fever and severe headache after swimming in a pond. What are the early symptoms of PAM?'"
+                    required
+                ></textarea>
+                <button
+                    type="submit"
+                    id="submitButton"
+                    class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg shadow-md transition duration-200 flex items-center justify-center disabled:opacity-50"
+                >
+                    <span id="buttonText">Get Educational Information</span>
+                    <svg id="loadingSpinner" class="hidden loading-animation w-5 h-5 ml-2 border-4 rounded-full" viewBox="0 0 24 24"></svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Response Area -->
+        <div class="mt-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">Information Result</h3>
+            <div id="responseContainer" class="response-container bg-white p-6 rounded-xl border border-gray-200 min-h-[150px] max-h-[60vh] overflow-y-auto text-gray-700">
+                <p class="text-gray-500 italic">Information will appear here. Remember: if you are ill, contact a doctor immediately.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const form = document.getElementById('symptomForm');
+        const userInput = document.getElementById('userInput');
+        const responseContainer = document.getElementById('responseContainer');
+        const submitButton = document.getElementById('submitButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        // Gemini API configuration
+        const apiKey = ""; 
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        
+        const SYSTEM_PROMPT = "You are a highly responsible public health information chatbot. Your primary function is to provide accurate, general, and up-to-date **educational information** about the symptoms and risks associated with *Naegleria fowleri* (brain-eating amoeba). **Under no circumstances should you provide a diagnosis, medical advice, or tell the user what specific action to take beyond advising them to seek immediate medical attention.** The response must start with a severe warning and end with a clear instruction to call emergency services or a healthcare professional immediately.";
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userQuery = userInput.value;
+            
+            // UI state management
+            submitButton.disabled = true;
+            buttonText.textContent = 'Analyzing...';
+            loadingSpinner.classList.remove('hidden');
+            responseContainer.innerHTML = '<div class="flex items-center justify-center h-full"><svg class="loading-animation w-6 h-6 border-4 rounded-full" viewBox="0 0 24 24"></svg><span class="ml-3 text-red-500">Retrieving information...</span></div>';
+
+            try {
+                let response;
+                // Exponential Backoff implementation
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        const payload = {
+                            contents: [{ parts: [{ text: userQuery }] }],
+                            tools: [{ "google_search": {} }], // Enable Google Search grounding
+                            systemInstruction: {
+                                parts: [{ text: SYSTEM_PROMPT }]
+                            },
+                        };
+
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.ok) {
+                            break; // Success, exit retry loop
+                        } else if (response.status === 429 && i < 2) {
+                            // Too many requests, retry with delay
+                            const delay = Math.pow(2, i) * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        } else {
+                            throw new Error(`API returned status ${response.status}`);
+                        }
+                    } catch (error) {
+                        if (i === 2) throw error; // Re-throw on final attempt
+                        console.warn(`Retry attempt ${i + 1} failed. Retrying...`);
+                    }
+                }
+
+                if (!response) throw new Error("API failed to respond after retries.");
+
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+                
+                let generatedText = "Could not retrieve educational content.";
+                let sourcesHtml = "";
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    generatedText = candidate.content.parts[0].text;
+                    
+                    // Extract and format grounding sources
+                    const groundingMetadata = candidate.groundingMetadata;
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        const sources = groundingMetadata.groundingAttributions
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title,
+                            }))
+                            .filter(source => source.uri && source.title);
+
+                        if (sources.length > 0) {
+                            sourcesHtml = `
+                                <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
+                                    <p class="font-semibold mb-1">Sources:</p>
+                                    ${sources.map((s, index) => 
+                                        `<p class="mb-1"><a href="${s.uri}" target="_blank" class="text-blue-600 hover:underline">${index + 1}. ${s.title}</a></p>`
+                                    ).join('')}
+                                </div>
+                            `;
+                        }
+                    }
+                }
+
+                // Render the response
+                responseContainer.innerHTML = `
+                    <div class="prose max-w-none">
+                        ${generatedText.replace(/\n/g, '<br/>')}
+                    </div>
+                    ${sourcesHtml}
+                `;
+
+            } catch (error) {
+                console.error("Error during content generation:", error);
+                responseContainer.innerHTML = `
+                    <div class="text-red-600 font-semibold">Error: Failed to fetch information.</div>
+                    <p class="text-sm text-gray-500 mt-1">Please ensure your network connection is stable.</p>
+                `;
+            } finally {
+                // Reset UI state
+                submitButton.disabled = false;
+                buttonText.textContent = 'Get Educational Information';
+                loadingSpinner.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
